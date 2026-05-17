@@ -11,6 +11,7 @@
 - A single commit should represent one self-contained change (e.g., "add hierarchical chunker", "wire ingest queue", "implement vector store").
 - Do not batch multiple unrelated features into one commit.
 - Push to `origin main` after every commit unless told otherwise.
+- If a push is rejected or you discover an error in the last commit, **squash the fix into that commit** (e.g., `git reset --soft HEAD~2 && git commit -m "..." && git push --force`) rather than pushing a separate follow-up fix commit. This keeps history clean.
 - Use conventional commit prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`.
 
 ## Testing
