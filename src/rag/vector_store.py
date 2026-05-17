@@ -85,7 +85,11 @@ class VectorStore:
             self._ensure_payload_indexes()
 
     def _ensure_payload_indexes(self, ) -> None:
-        for field_name, field_type in [("type", "keyword"), ("index", "integer")]:
+        for field_name, field_type in [
+            ("type", "keyword"),
+            ("index", "integer"),
+            ("bike_model", "keyword"),
+        ]:
             try:
                 self.client.create_payload_index(
                     collection_name=self.collection,
@@ -118,6 +122,10 @@ class VectorStore:
                         "chapter": doc.metadata.get("Chapter", ""),
                         "section": doc.metadata.get("Section", ""),
                         "subsection": doc.metadata.get("Subsection", ""),
+                        "bike_make": doc.metadata.get("bike_make", ""),
+                        "bike_model": doc.metadata.get("bike_model", ""),
+                        "bike_year": doc.metadata.get("bike_year", None),
+                        "bike_full_name": doc.metadata.get("bike_full_name", ""),
                     },
                 )
             )
@@ -149,6 +157,10 @@ class VectorStore:
                         "chapter": doc.metadata.get("Chapter", ""),
                         "section": doc.metadata.get("Section", ""),
                         "subsection": doc.metadata.get("Subsection", ""),
+                        "bike_make": doc.metadata.get("bike_make", ""),
+                        "bike_model": doc.metadata.get("bike_model", ""),
+                        "bike_year": doc.metadata.get("bike_year", None),
+                        "bike_full_name": doc.metadata.get("bike_full_name", ""),
                     },
                 )
             )
@@ -158,18 +170,22 @@ class VectorStore:
         logger.info("Stored %d parent vectors in '%s'", len(points), self.collection)
         return len(points)
 
-    def get_parents_by_indices(self, indices: list[int]) -> list[Document]:
+    def get_parents_by_indices(
+        self, indices: list[int], extra_filter: Optional[list[FieldCondition]] = None
+    ) -> list[Document]:
         if not indices:
             return []
 
+        must_conditions: list[FieldCondition] = [
+            FieldCondition(key="type", match=MatchValue(value="parent")),
+            FieldCondition(key="index", match=MatchAny(any=indices)),
+        ]
+        if extra_filter:
+            must_conditions.extend(extra_filter)
+
         records, _ = self.client.scroll(
             collection_name=self.collection,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(key="type", match=MatchValue(value="parent")),
-                    FieldCondition(key="index", match=MatchAny(any=indices)),
-                ]
-            ),
+            scroll_filter=Filter(must=must_conditions),
             limit=len(indices),
             with_payload=True,
             with_vectors=False,
@@ -184,6 +200,10 @@ class VectorStore:
                 "chapter": payload.get("chapter", ""),
                 "section": payload.get("section", ""),
                 "subsection": payload.get("subsection", ""),
+                "bike_make": payload.get("bike_make", ""),
+                "bike_model": payload.get("bike_model", ""),
+                "bike_year": payload.get("bike_year", None),
+                "bike_full_name": payload.get("bike_full_name", ""),
             }
             docs.append(
                 Document(page_content=payload.get("text", ""), metadata=metadata)
@@ -191,14 +211,23 @@ class VectorStore:
         return docs
 
     def similarity_search(
-        self, query: str, k: int = 5, doc_type: str = "child"
+        self,
+        query: str,
+        k: int = 5,
+        doc_type: str = "child",
+        extra_filter: Optional[list[FieldCondition]] = None,
     ) -> list[Document]:
         query_vector = self.model.encode(query).tolist()
         query_filter: Optional[Filter] = None
-        if doc_type:
-            query_filter = Filter(
-                must=[FieldCondition(key="type", match=MatchValue(value=doc_type))]
-            )
+        if doc_type or extra_filter:
+            must_conditions: list[FieldCondition] = []
+            if doc_type:
+                must_conditions.append(
+                    FieldCondition(key="type", match=MatchValue(value=doc_type))
+                )
+            if extra_filter:
+                must_conditions.extend(extra_filter)
+            query_filter = Filter(must=must_conditions)
         response = self.client.query_points(
             collection_name=self.collection,
             query=query_vector,
@@ -216,6 +245,10 @@ class VectorStore:
                 "chapter": payload.get("chapter", ""),
                 "section": payload.get("section", ""),
                 "subsection": payload.get("subsection", ""),
+                "bike_make": payload.get("bike_make", ""),
+                "bike_model": payload.get("bike_model", ""),
+                "bike_year": payload.get("bike_year", None),
+                "bike_full_name": payload.get("bike_full_name", ""),
                 "score": hit.score,
             }
             docs.append(

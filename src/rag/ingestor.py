@@ -9,8 +9,9 @@ import yaml
 
 dotenv.load_dotenv()
 
+from src.rag.bike_meta import extract_bike_info
 from src.rag.chunking import HierarchicalChunker
-from src.rag.loader import load_and_chunk
+from src.rag.loader import load_and_chunk, read_first_pages
 from src.rag.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class Ingestor:
         self,
         config_path: str = _DEFAULT_CONFIG_PATH,
         vector_store: Optional[VectorStore] = None,
+        recreate: bool = False,
     ) -> None:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
@@ -66,6 +68,15 @@ class Ingestor:
             "model", "all-MiniLM-L6-v2"
         )
 
+        self._llm_config = {
+            "model": rag_cfg.get("llm", {}).get("model", "llama-3.3-70b-versatile"),
+            "base_url": rag_cfg.get("llm", {}).get(
+                "base_url", "https://api.groq.com/openai/v1"
+            ),
+        }
+        # GROQ_API_KEY is loaded via dotenv
+        self._groq_api_key = os.environ.get("GROQ_API_KEY", "")
+
         self._chunker = HierarchicalChunker(
             parent_size=self.parent_size,
             child_size=self.chunk_size,
@@ -75,6 +86,7 @@ class Ingestor:
         self._vs_config = {
             "url": _resolve_env(vs_cfg.get("url", "")),
             "api_key": _resolve_env(vs_cfg.get("api_key", "")),
+            "recreate": recreate,
         }
         self._vector_store = vector_store  # may be None (lazy init)
         self._parent_offset: int = 0
@@ -87,6 +99,7 @@ class Ingestor:
                 url=self._vs_config["url"],
                 api_key=self._vs_config["api_key"],
                 model_name=self.embedding_model,
+                recreate=self._vs_config["recreate"],
             )
         return self._vector_store
 
@@ -95,6 +108,15 @@ class Ingestor:
     ) -> IngestResult:
         name = original_name or os.path.basename(file_path)
         logger.info("Ingesting %s ...", name)
+
+        # Extract bike info from first 2 pages
+        first_pages = read_first_pages(file_path, n=2)
+        bike_info = extract_bike_info(
+            first_pages,
+            api_key=self._groq_api_key,
+            base_url=self._llm_config["base_url"],
+            model=self._llm_config["model"],
+        )
 
         parents, children = load_and_chunk(
             file_path,
@@ -112,14 +134,22 @@ class Ingestor:
             self.chunk_overlap,
         )
 
-        # Attach source filename to all documents
+        # Attach source filename and bike metadata to all documents
         for child in children:
             child.metadata["source"] = name
+            child.metadata["bike_make"] = bike_info.get("make", "")
+            child.metadata["bike_model"] = bike_info.get("model", "")
+            child.metadata["bike_year"] = bike_info.get("year", None)
+            child.metadata["bike_full_name"] = bike_info.get("full_name", "")
             if "parent_index" in child.metadata:
                 child.metadata["parent_index"] += self._parent_offset
 
         for parent in parents:
             parent.metadata["source"] = name
+            parent.metadata["bike_make"] = bike_info.get("make", "")
+            parent.metadata["bike_model"] = bike_info.get("model", "")
+            parent.metadata["bike_year"] = bike_info.get("year", None)
+            parent.metadata["bike_full_name"] = bike_info.get("full_name", "")
 
         for p_idx, parent in enumerate(parents):
             parent.metadata["index"] = self._parent_offset + p_idx

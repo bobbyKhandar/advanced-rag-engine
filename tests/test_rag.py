@@ -643,10 +643,16 @@ class TestRagProcessor:
             },
         )
 
+    @patch("src.rag.rag_processor.decompose_query")
     @patch("src.rag.rag_processor.Generator")
     @patch("src.rag.rag_processor.VectorStore")
     @patch("dotenv.load_dotenv")
-    def test_process_formats_results(self, mock_dotenv, MockVectorStore, MockGenerator):
+    def test_process_formats_results(
+        self, mock_dotenv, MockVectorStore, MockGenerator, mock_decompose
+    ):
+        mock_decompose.return_value = {
+            "make": None, "model": None, "question": "brake",
+        }
         mock_vs = MagicMock()
         mock_vs.similarity_search.return_value = [
             self._make_child_doc("Brake lever torque", 0.95, "manual.pdf", parent_index=0),
@@ -680,14 +686,21 @@ class TestRagProcessor:
         assert "brake lever torque" in result.lower()
         assert "oil change" in result.lower()
         # Verify context was passed to generator
-        call_context = mock_gen.generate.call_args[0][1]
+        call_kwargs = mock_gen.generate.call_args[1]
+        call_context = call_kwargs["context"]
         assert "Brake lever torque" in call_context
         assert "Oil change interval" in call_context
 
+    @patch("src.rag.rag_processor.decompose_query")
     @patch("src.rag.rag_processor.Generator")
     @patch("src.rag.rag_processor.VectorStore")
     @patch("dotenv.load_dotenv")
-    def test_process_empty_results(self, mock_dotenv, MockVectorStore, MockGenerator):
+    def test_process_empty_results(
+        self, mock_dotenv, MockVectorStore, MockGenerator, mock_decompose
+    ):
+        mock_decompose.return_value = {
+            "make": None, "model": None, "question": "nonexistent topic",
+        }
         mock_vs = MagicMock()
         mock_vs.similarity_search.return_value = []
         MockVectorStore.return_value = mock_vs
@@ -745,7 +758,7 @@ class TestSmallToBigRetriever:
         assert len(results) == 2
         assert results[0].page_content == "## Parent A content"
         assert results[1].page_content == "## Parent B content"
-        mock_store.get_parents_by_indices.assert_called_once_with([0, 1])
+        mock_store.get_parents_by_indices.assert_called_once_with([0, 1], extra_filter=None)
 
     def test_retrieve_empty_results(self):
         from src.rag.retriever import SmallToBigRetriever

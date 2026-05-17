@@ -13,6 +13,13 @@ def get_page_count(file_path: str) -> int:
         return doc.page_count
 
 
+def read_first_pages(file_path: str, n: int = 2) -> str:
+    """Convert the first *n* pages of a PDF to markdown (no page skipping)."""
+    total = get_page_count(file_path)
+    pages = list(range(min(n, total)))
+    return pymupdf4llm.to_markdown(file_path, pages=pages)
+
+
 def load_pdf_to_markdown(
     file_path: str,
     skip_start: int = 0,

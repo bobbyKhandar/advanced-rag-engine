@@ -1,8 +1,10 @@
 """Document retrieval logic — Small-to-Big strategy."""
 
 import logging
+from typing import Optional
 
 from langchain_core.documents import Document
+from qdrant_client.models import FieldCondition, MatchValue
 
 from src.rag.vector_store import VectorStore
 
@@ -15,8 +17,18 @@ class SmallToBigRetriever:
     def __init__(self, vector_store: VectorStore) -> None:
         self._vector_store = vector_store
 
-    def retrieve(self, query: str, k: int = 5) -> list[Document]:
-        child_docs = self._vector_store.similarity_search(query, k=k)
+    def _bike_filter(self, bike_model: Optional[str]) -> Optional[list[FieldCondition]]:
+        if not bike_model:
+            return None
+        return [FieldCondition(key="bike_model", match=MatchValue(value=bike_model))]
+
+    def retrieve(
+        self, query: str, k: int = 5, bike_model: Optional[str] = None
+    ) -> list[Document]:
+        bike_filter = self._bike_filter(bike_model)
+        child_docs = self._vector_store.similarity_search(
+            query, k=k, extra_filter=bike_filter
+        )
         if not child_docs:
             return []
 
@@ -30,7 +42,9 @@ class SmallToBigRetriever:
         if not parent_indices:
             return []
 
-        parent_docs = self._vector_store.get_parents_by_indices(parent_indices)
+        parent_docs = self._vector_store.get_parents_by_indices(
+            parent_indices, extra_filter=bike_filter
+        )
 
         best_scores: dict[int, float] = {}
         for child in child_docs:
