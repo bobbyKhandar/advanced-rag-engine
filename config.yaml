@@ -1,0 +1,15 @@
+bot:
+  telegram_token: ${TELEGRAM_TOKEN}
+
+rag:
+  chunk_size: 512
+  chunk_overlap: 64
+  top_k: 5
+  llm_model: gpt-4o-mini
+  llm_temperature: 0.3
+  confidence_threshold: 0.7
+
+vector_store:
+  url: ${QDRANT_URL}
+  api_key: ${QDRANT_API_KEY}
+  collection: bike_manuals

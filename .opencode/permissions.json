@@ -1,0 +1,6 @@
+{
+  "permissions": [
+    {"action": "allow", "permission": "*", "pattern": "*"},
+    {"action": "allow", "permission": "edit", "pattern": "src/**"}
+  ]
+}
