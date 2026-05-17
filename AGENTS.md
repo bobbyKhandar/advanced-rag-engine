@@ -1,0 +1,19 @@
+# Agent Instructions
+
+## Code Architecture
+
+- Strictly follow a **modular monolithic** approach. All code lives in a single deployable unit (no microservices, no separate servers). Modules within the project (`src/rag/`, `src/bot/`, `src/config/`) are logically separated by concern but remain in one codebase.
+- Keep modules loosely coupled: each module imports from `src/...` paths but should not depend on internal implementation details of sibling modules.
+
+## Commit & Push Discipline
+
+- Commit **and push** immediately after completing any feature, section, or logical unit of work.
+- A single commit should represent one self-contained change (e.g., "add hierarchical chunker", "wire ingest queue", "implement vector store").
+- Do not batch multiple unrelated features into one commit.
+- Push to `origin main` after every commit unless told otherwise.
+- Use conventional commit prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`.
+
+## Testing
+
+- Every feature must have tests. Run the full test suite before committing.
+- Keep existing tests passing.
