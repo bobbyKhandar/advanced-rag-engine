@@ -9,7 +9,13 @@ from telegram.ext import (
 )
 
 from src.bot.base import BotHandler, KeyboardBuilder
-from src.bot.handlers import HelpHandler, QueryHandler, StartHandler
+from src.bot.handlers import (
+    DocumentUploadHandler,
+    HelpHandler,
+    QueryHandler,
+    StartHandler,
+)
+from src.bot.ingest_queue import IngestItem, IngestQueue
 from src.bot.keyboards import ConfirmKeyboard, MainMenuKeyboard
 from src.bot.query_queue import Processor, QueryItem, QueryQueue
 from src.bot.states import ConversationState
@@ -26,14 +32,14 @@ def configure_logging(debug: bool = False) -> None:
 
 
 async def _post_init(app: Application) -> None:
-    queue: QueryQueue = app.bot_data["query_queue"]
-    queue.start()
+    app.bot_data["query_queue"].start()
+    app.bot_data["ingest_queue"].start()
     logger.info("Application initialized")
 
 
 async def _post_stop(app: Application) -> None:
-    queue: QueryQueue = app.bot_data["query_queue"]
-    await queue.stop()
+    await app.bot_data["query_queue"].stop()
+    await app.bot_data["ingest_queue"].stop()
     logger.info("Application stopped")
 
 
@@ -47,12 +53,14 @@ def create_application(token: str, processor: Optional[Processor] = None) -> App
     )
 
     app.bot_data["query_queue"] = QueryQueue(processor=processor)
+    app.bot_data["ingest_queue"] = IngestQueue(bot=app.bot)
 
     app.add_handler(CommandHandler("start", StartHandler()))
     app.add_handler(CommandHandler("help", HelpHandler()))
+    app.add_handler(MessageHandler(filters.Document.PDF, DocumentUploadHandler()))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, QueryHandler()))
 
-    logger.info("Application created with %d handlers", 3)
+    logger.info("Application created with %d handlers", 4)
     return app
 
 
@@ -65,6 +73,8 @@ __all__ = [
     "Processor",
     "QueryItem",
     "QueryQueue",
+    "IngestItem",
+    "IngestQueue",
     "MainMenuKeyboard",
     "ConfirmKeyboard",
 ]

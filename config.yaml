@@ -5,6 +5,13 @@ bot:
 rag:
   chunk_size: 512
   chunk_overlap: 64
+  chunking:
+    strategy: hierarchical
+    parent_size: 2048
+    skip_toc_pages: 4
+    skip_index_pages: 3
+  embedding:
+    model: all-MiniLM-L6-v2
   top_k: 5
   llm_model: gpt-4o-mini
   llm_temperature: 0.3

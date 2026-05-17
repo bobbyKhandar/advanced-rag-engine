@@ -1,9 +1,11 @@
 import logging
+import os
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from src.bot.base import BotHandler
+from src.bot.ingest_queue import IngestItem
 from src.bot.keyboards import MainMenuKeyboard
 from src.bot.query_queue import QueryQueue
 
@@ -58,3 +60,26 @@ class QueryHandler(BotHandler):
             await update.message.reply_text(
                 "Sorry, I couldn't process your question right now. Please try again later."
             )
+
+
+class DocumentUploadHandler(BotHandler):
+    UPLOAD_DIR = os.path.join("data", "uploads")
+
+    async def handle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        document = update.effective_message.document
+        os.makedirs(self.UPLOAD_DIR, exist_ok=True)
+
+        file = await context.bot.get_file(document.file_id)
+        dest = os.path.join(self.UPLOAD_DIR, f"{document.file_id}.pdf")
+        await file.download_to_drive(dest)
+
+        queue = context.application.bot_data["ingest_queue"]
+        item = IngestItem(
+            file_path=dest,
+            original_name=document.file_name or "document.pdf",
+            chat_id=update.effective_chat.id,
+            user_id=update.effective_user.id,
+        )
+        await queue.enqueue(item)
+
+        await update.message.reply_text("Got it, processing...")

@@ -5,11 +5,12 @@ from abc import ABC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from telegram import Update
+from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
 from src.bot.base import BotHandler
 from src.bot.query_queue import Processor, QueryQueue, QueryItem
+from src.rag.ingestor import Ingestor
 
 
 # ── Mock Processors ──────────────────────────────────────────────────
@@ -195,3 +196,138 @@ async def test_handler_error_boundary():
     mock_update.effective_chat.send_message.assert_awaited_once_with(
         "An unexpected error occurred. Please try again."
     )
+
+
+# ── IngestItem dataclass ──────────────────────────────────────────────
+
+
+class TestIngestItem:
+
+    def test_fields(self):
+        from src.bot.ingest_queue import IngestItem
+
+        item = IngestItem(
+            file_path="/tmp/doc.pdf",
+            original_name="doc.pdf",
+            chat_id=123,
+            user_id=456,
+        )
+        assert item.file_path == "/tmp/doc.pdf"
+        assert item.original_name == "doc.pdf"
+        assert item.chat_id == 123
+        assert item.user_id == 456
+
+
+# ── IngestQueue ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ingest_queue_lifecycle():
+    from src.bot.ingest_queue import IngestQueue
+
+    bot = MagicMock(spec=Bot)
+    bot.send_message = AsyncMock()
+
+    queue = IngestQueue(bot=bot)
+    assert not queue.is_running
+    assert queue.queue_size == 0
+
+    queue.start()
+    assert queue.is_running
+
+    await queue.stop()
+    assert not queue.is_running
+
+
+@pytest.mark.asyncio
+async def test_ingest_queue_enqueue():
+    from src.bot.ingest_queue import IngestItem, IngestQueue
+
+    bot = MagicMock(spec=Bot)
+    bot.send_message = AsyncMock()
+
+    queue = IngestQueue(bot=bot)
+    queue.start()
+
+    item = IngestItem(
+        file_path="/tmp/test.pdf",
+        original_name="test.pdf",
+        chat_id=100,
+        user_id=1,
+    )
+    await queue.enqueue(item)
+
+    # Give the worker a moment to process
+    await asyncio.sleep(0.1)
+
+    await queue.stop()
+
+    bot.send_message.assert_awaited_once()
+    _args, kwargs = bot.send_message.call_args
+    assert kwargs["chat_id"] == 100
+    assert "test.pdf" in kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_queue_enqueue_failure():
+    from src.bot.ingest_queue import IngestItem, IngestQueue
+
+    bot = MagicMock(spec=Bot)
+    bot.send_message = AsyncMock()
+
+    queue = IngestQueue(bot=bot)
+    queue.start()
+
+    # Monkey-patch the ingestor to raise
+    from src.rag.ingestor import Ingestor
+    original = Ingestor.process_document
+
+    def _fail(*args, **kwargs):
+        raise RuntimeError("oops")
+
+    Ingestor.process_document = _fail
+
+    item = IngestItem(
+        file_path="/tmp/bad.pdf",
+        original_name="bad.pdf",
+        chat_id=200,
+        user_id=2,
+    )
+    await queue.enqueue(item)
+    await asyncio.sleep(0.1)
+
+    Ingestor.process_document = original
+    await queue.stop()
+
+    # Should have sent an error message
+    bot.send_message.assert_awaited_once()
+    _args, kwargs = bot.send_message.call_args
+    assert kwargs["chat_id"] == 200
+    assert "bad.pdf" in kwargs["text"]
+    assert "oops" in kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_queue_size():
+    from src.bot.ingest_queue import IngestItem, IngestQueue
+
+    bot = MagicMock(spec=Bot)
+    bot.send_message = AsyncMock()
+
+    queue = IngestQueue(bot=bot, max_concurrency=1)
+
+    # Enqueue before starting — worker hasn't consumed anything yet
+    item1 = IngestItem(file_path="/a/1.pdf", original_name="1.pdf", chat_id=1, user_id=1)
+    item2 = IngestItem(file_path="/a/2.pdf", original_name="2.pdf", chat_id=2, user_id=2)
+
+    await queue.enqueue(item1)
+    await queue.enqueue(item2)
+
+    assert queue.queue_size == 2
+
+    # Start the worker and let it drain
+    queue.start()
+    await asyncio.sleep(0.1)
+
+    assert queue.queue_size == 0
+    await queue.stop()
