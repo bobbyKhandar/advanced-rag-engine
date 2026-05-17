@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     TELEGRAM_TOKEN: str = ""
     BOT_USERNAME: str = ""
     OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""
     DEBUG: bool = False

@@ -34,6 +34,7 @@ class IngestResult:
     chunks: int = 0
     parents: int = 0
     stored: int = 0
+    stored_parents: int = 0
     success: bool = True
     error: Optional[str] = None
 
@@ -76,6 +77,7 @@ class Ingestor:
             "api_key": _resolve_env(vs_cfg.get("api_key", "")),
         }
         self._vector_store = vector_store  # may be None (lazy init)
+        self._parent_offset: int = 0
 
     @property
     def vector_store(self) -> VectorStore:
@@ -110,7 +112,21 @@ class Ingestor:
             self.chunk_overlap,
         )
 
+        # Attach source filename to all documents
+        for child in children:
+            child.metadata["source"] = name
+            if "parent_index" in child.metadata:
+                child.metadata["parent_index"] += self._parent_offset
+
+        for parent in parents:
+            parent.metadata["source"] = name
+
+        for p_idx, parent in enumerate(parents):
+            parent.metadata["index"] = self._parent_offset + p_idx
+
         stored = self.vector_store.add_documents(children)
+        stored_parents = self.vector_store.add_parent_documents(parents)
+        self._parent_offset += len(parents)
 
         return IngestResult(
             file_path=file_path,
@@ -118,6 +134,7 @@ class Ingestor:
             chunks=len(children),
             parents=len(parents),
             stored=stored,
+            stored_parents=stored_parents,
             success=True,
         )
 

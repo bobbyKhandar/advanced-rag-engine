@@ -13,8 +13,11 @@ rag:
   embedding:
     model: all-MiniLM-L6-v2
   top_k: 5
-  llm_model: gpt-4o-mini
-  llm_temperature: 0.3
+  llm:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    base_url: https://api.groq.com/openai/v1
+    temperature: 0.3
   confidence_threshold: 0.7
 
 vector_store:

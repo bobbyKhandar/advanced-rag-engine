@@ -10,7 +10,7 @@ def main() -> None:
 
     processor = RagProcessor()
     app = create_application(token=settings.TELEGRAM_TOKEN, processor=processor)
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
