@@ -1,8 +1,10 @@
 services:
   bot:
     build: .
+    # Provide your own .env file (copy from .env.example and fill in your keys)
     env_file:
       - .env
+    # Only persist user uploads; manuals are baked into the image
     volumes:
-      - ./data:/app/data
+      - ./data/uploads:/app/data/uploads
     restart: unless-stopped
