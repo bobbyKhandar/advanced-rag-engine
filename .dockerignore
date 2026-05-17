@@ -1,0 +1,11 @@
+.env
+.git
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+README.md
+AGENTS.md
+LICENSE
+data/vector_db/
+data/uploads/
