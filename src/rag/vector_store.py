@@ -66,6 +66,7 @@ class VectorStore:
                 collection,
                 self.dimension,
             )
+            self._ensure_payload_indexes()
         elif not self.client.collection_exists(collection):
             self.client.create_collection(
                 collection_name=collection,
@@ -79,6 +80,21 @@ class VectorStore:
                 collection,
                 self.dimension,
             )
+            self._ensure_payload_indexes()
+        else:
+            self._ensure_payload_indexes()
+
+    def _ensure_payload_indexes(self, ) -> None:
+        for field_name, field_type in [("type", "keyword"), ("index", "integer")]:
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name=field_name,
+                    field_type=field_type,
+                )
+                logger.info("Created payload index on '%s' (%s)", field_name, field_type)
+            except Exception:
+                pass
 
     def add_documents(self, documents: list[Document]) -> int:
         if not documents:
