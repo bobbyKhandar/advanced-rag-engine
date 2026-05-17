@@ -1,5 +1,6 @@
 bot:
   telegram_token: ${TELEGRAM_TOKEN}
+  telegram_username: ${BOT_USERNAME}
 
 rag:
   chunk_size: 512

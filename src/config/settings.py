@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     )
 
     TELEGRAM_TOKEN: str = ""
+    BOT_USERNAME: str = ""
     DEBUG: bool = False
 
 
