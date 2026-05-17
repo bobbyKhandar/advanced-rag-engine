@@ -7,6 +7,11 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 logger = logging.getLogger(__name__)
 
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None  # type: ignore[assignment]
+
 
 class VectorStore:
 
@@ -25,8 +30,10 @@ class VectorStore:
         )
         self.collection = collection
 
-        from sentence_transformers import SentenceTransformer
-
+        if SentenceTransformer is None:
+            raise ImportError(
+                "sentence-transformers is required. Install it with: pip install sentence-transformers"
+            )
         self.model = SentenceTransformer(model_name)
         self.dimension = self.model.get_embedding_dimension()
 

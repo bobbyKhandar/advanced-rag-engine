@@ -375,7 +375,7 @@ class TestCollectPdfs:
 
 class TestVectorStore:
 
-    @patch("sentence_transformers.SentenceTransformer")
+    @patch("src.rag.vector_store.SentenceTransformer")
     @patch("src.rag.vector_store.QdrantClient")
     def test_add_documents(self, MockClient, MockTransformer):
         mock_model = MagicMock()
@@ -398,7 +398,7 @@ class TestVectorStore:
         assert n == 2
         mock_client.upsert.assert_called_once()
 
-    @patch("sentence_transformers.SentenceTransformer")
+    @patch("src.rag.vector_store.SentenceTransformer")
     @patch("src.rag.vector_store.QdrantClient")
     def test_add_empty_returns_zero(self, MockClient, MockTransformer):
         mock_model = MagicMock()
@@ -413,7 +413,7 @@ class TestVectorStore:
         n = store.add_documents([])
         assert n == 0
 
-    @patch("sentence_transformers.SentenceTransformer")
+    @patch("src.rag.vector_store.SentenceTransformer")
     @patch("src.rag.vector_store.QdrantClient")
     def test_similarity_search(self, MockClient, MockTransformer):
         mock_model = MagicMock()
@@ -450,7 +450,7 @@ class TestVectorStore:
         assert results[0].metadata["score"] == 0.95
         mock_client.query_points.assert_called_once()
 
-    @patch("sentence_transformers.SentenceTransformer")
+    @patch("src.rag.vector_store.SentenceTransformer")
     @patch("src.rag.vector_store.QdrantClient")
     def test_len(self, MockClient, MockTransformer):
         mock_model = MagicMock()
